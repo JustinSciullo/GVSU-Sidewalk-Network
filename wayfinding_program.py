@@ -1,29 +1,48 @@
-# Import module
+#!/usr/bin/env python #
+"""A script for calculating and displaying the shortest path between buildings at GVSU using Dijkstra's algorithm,
+and then displaying the results using Tkinter for user readability.
+"""
+
+__author__ = "Justin Sciullo"
+__email__ = "JustinDSciullo@Gmail.com"
+__date__ = "05/02/2024"
+
+# Import dependencies
 from sys import maxsize
 from tkinter import *
+
 import networkx as nx
 import tkintermapview
+
 from read_data import *
 
 
-def shortest_path_between_buildings(initial_building=str, destination_building=str):
-    # Find the short version of our building names
+def shortest_path_between_buildings(starting_building: str, destination_building: str) -> tuple[float, list]:
+    """This function finds the shortest path between two buildings on the Grand Valley State University Allendale
+    campus, and returns the shortest path through our network between the two buildings as well as the length of this
+    path.
+
+    :param starting_building: The name of the building that one is starting in.
+    :param destination_building: The name
+    of the building that one wants to end in.
+    :returns: A tuple of the length of the shortest path between the two buildings and
+    a list of the shortest path taken through the graph.
+    """
+
+    # Reverse building_name_dict to easily access acronyms
     name_to_node_dict = {j: i for i, j in building_name_dict.items()}
-    initial_node_name = name_to_node_dict[initial_building]
+
+    # Convert the full building name into the acronym for the building entrance nodes =
+    initial_node_name = name_to_node_dict[starting_building]
     destination_node_name = name_to_node_dict[destination_building]
 
-    # Create a list of every node with a matching name
-    initial_nodes = []
-    destination_nodes = []
-    for node in GVSU.nodes:
-        if node.split('_')[0] == initial_node_name:
-            initial_nodes.append(node)
-        elif node.split('_')[0] == destination_node_name:
-            destination_nodes.append(node)
+    # Create a list of every entrance node for our buildings
+    initial_nodes = [node for node in GVSU.nodes if node.split('_')[0] == initial_node_name]
+    destination_nodes = [node for node in GVSU.nodes if node.split('_')[0] == destination_node_name]
 
-    # Run Dijkstras alg on every combinaiton of nodes, and return the best one
+    # Run Dijkstra's alg on every combination of nodes, and return the best one
     shortest_distance = maxsize
-    shortest_path = []
+    shortest_path = -1
     for u in initial_nodes:
         for v in destination_nodes:
             path = nx.dijkstra_path(GVSU, u, v)
@@ -31,54 +50,44 @@ def shortest_path_between_buildings(initial_building=str, destination_building=s
             if distance < shortest_distance:
                 shortest_distance = distance
                 shortest_path = path
-
     return shortest_distance, shortest_path
 
 
-# Def function to display the results of our alg
-def display_results(starting_building, destination_building):
-    global results
+def display_results(starting_building: StringVar(), destination_building: StringVar()):
+    """This function calls shortest_path_between_buildings, and then displays the results in our window.
+
+    :param starting_building: The name of the building that one is starting in.
+    :param destination_building: The name
+    of the building that one wants to end in.
+    """
+    global results  # Access the text box beneath the buttons, so we can modify it
+
+    # Calculate the shortest path between our two buildings
     distance, path_taken = shortest_path_between_buildings(starting_building.get(), destination_building.get())
 
-    # Draw our path
-    path_width = 4
-    path_color = 'red'
-
+    # Draw our path on the map
     map_widget.delete_all_path()
     path_coords = [(gps_coordinate_dict[i][0], -1 * gps_coordinate_dict[i][1]) for i in path_taken]
-    map_widget.set_path(path_coords, color=path_color, width=path_width)
+    map_widget.set_path(path_coords, color='red', width=4)
 
-    # Reframe our screen
-    bottom = 100
-    top = 0
-    left = 0
-    right = -100
-    for path in path_coords:
-        x, y = path
-        if x < bottom:
-            bottom = x
-        if x > top:
-            top = x
-        if y < left:
-            left = y
-        if y > right:
-            right = y
+    # Reframe our window around our new path
+    x_coords, y_coords = zip(*path_coords)
+    bottom, top = min(x_coords), max(x_coords)
+    left, right = min(y_coords), max(y_coords)
     map_widget.fit_bounding_box((top, left), (bottom, right))
 
+    # Update the text in the results variable
     results['text'] = (
-        f'The shortest path from {starting_building.get()} to {destination_building.get()} is {distance}m long. \n It '
-        f'will take you about {round(distance * (1 / 1.42) * (1 / 60), 1)} minutes to get there.')
+        f'The shortest path from {starting_building.get()} to {destination_building.get()} is {distance:.2f}m long.'
+        f' \n It will take you about {round(distance * (1 / 1.42) * (1 / 60), 1)} minutes to get there.')
     results.pack()
-    # path.pack()
 
 
 if __name__ == "__main__":
-    # Create the window
-    window = Tk()
+    window = Tk()  # Create the window
     window.geometry('800x700')
-    window.title('Dijkstras Algorithim Assitant')
+    window.title("Dijkstra's Algorithm Assistant")
 
-    # Specifiy our variables
     initial_node = StringVar()
     destination_node = StringVar()
 
@@ -97,15 +106,15 @@ if __name__ == "__main__":
                        command=lambda: display_results(initial_node, destination_node))
     calculate.pack()
 
-    # Create a text box to display the results
+    # Create an empty text box to display the results once found
     results = Label(window, text='')
     results.pack()
 
-    # Create the map widget
+    # Create the map widget with high quality map tiles
     map_widget = tkintermapview.TkinterMapView(window, width=700, height=500, corner_radius=0)
     map_widget.place(relx=0.5, rely=0.99, anchor=S)
     map_widget.set_tile_server(r"https://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}&s=Ga", max_zoom=22)
-    map_widget.set_position(42.9626606, -85.8874659)
+    map_widget.set_position(42.9626606, -85.8874659)  # Center on GVSU
     map_widget.set_zoom(15)
 
     window.mainloop()
